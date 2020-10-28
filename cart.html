@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8" />
+
+<link href="/css/reset.css" th:href="@{/css/reset.css}" rel="stylesheet" />
+<link href="/css/style.css" th:href="@{/css/style.css}" rel="stylesheet" />
+
+<script src="http://code.jquery.com/jquery-3.4.1.min.js"></script>
+
+<title>Mushrooms | カート</title>
+</head>
+<body>
+
+<header th:insert="fragments/page_header::pageHeader"></header>
+
+
+<main>
+
+	<div class="container cart">
+		<h2>カート</h2>
+		
+		<div class="noData" th:if="${cartList == null || cartList.size() == 0}">
+			<p class="info">カート情報はありません。</p>
+		</div>
+		
+		<table th:if="${cartList != null && cartList.size() > 0}" class="cart">
+			<thead>
+				<tr>
+					<th>選択</th>
+					<th>画像</th>
+					<th>商品名</th>
+					<th>価格(円)</th>
+					<th>個数</th>
+					<th>小計(円)</th>
+				</tr>
+			</thead>	
+			<tbody>
+				<tr th:each="item: ${cartList}">
+					<td>
+						<input th:value="${item.id}" type="checkbox" name="id" class="checkbox"/>
+					</td>
+					<td class="image">
+						<img class="itemImage" th:src="${item.imageFullPath}" />
+					</td>
+					<td th:text="${item.productName}" />
+					<td class="number"  th:text="${item.price}"/>
+					<td class="number productCount"  th:text="${item.productCount}"/>
+					<td class="number subtotal" th:text="${item.subtotal}" />
+				</tr>
+				<tr>
+					<td class="totalArea"></td>
+					<td class="totalArea"></td>
+					<td class="totalArea">合計（円）</td>
+					<td class="totalArea"></td>
+					<td class="totalArea" id="totalCount"></td>
+					<td class="totalArea" id="totalPrice"></td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div th:if="${cartList != null && cartList.size() > 0}" class="buttonArea">
+			<button id="delete" disabled>削除</button>
+			<button id="buy">購入</button>
+		</div>
+	</div>
+</main>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+	
+$(() => {
+	
+	//OnLoadで合計個数・金額算出
+	calcTotal();
+	
+	//削除ボタンの活性/非活性
+	$('.checkbox').on('change', changeDeleteBtn);
+
+	//削除ボタン押下時の処理
+	$('#delete').on('click', () => { 
+
+		let checkedList = $('.checkbox:checked');
+		let deleteIdList = [];
+		for (checked of checkedList){
+			deleteIdList.push($(checked).val());
+		};
+		deleteCart(checkedList, deleteIdList);
+	
+	});
+	
+	//購入ボタン押下時の処理
+	$('#buy').on('click', () => {
+		let loginStatus = /*[[${loginSession.getLogined()}]]*/;
+		if(!loginStatus && isEmpty($('#hiddenUserName').val())){
+			alert('ログインしてください。');
+		}else {
+			location.href = '/mushrooms/settlement/';
+		}
+
+	  });
+
+
+});
+
+
+// 削除ボタンの活性/非活性の関数定義
+function changeDeleteBtn(){
+	let checkBox = $('.checkbox');
+	let disabled = true;
+
+	//checkbox内でcheckedがあれば、ボタン活性化
+	for (let check of checkBox) {
+		if($(check).prop('checked')) {
+			disabled = false;
+			break;
+		}
+	}
+	$('#delete').prop('disabled', disabled);
+}
+
+
+
+//合計個数/値段を計算する関数定義
+function calcTotal() {
+	let productCount = $('.productCount');
+	let subtotal = $('.subtotal');
+	let totalCount = 0;
+	let totalPrice = 0;
+
+	for(let i = 0; i < productCount.length; i++){
+		//　個数と小計を足していく
+		totalCount += parseInt($(productCount[i]).text());
+		totalPrice += parseInt($(subtotal[i]).text());
+	}
+	$('#totalCount').text(totalCount);
+	$('#totalPrice').text(totalPrice);
+}
+
+
+
+//削除ボタン押下時の処理定義
+function deleteCart(checkedList, deleteIdList) {
+		$.ajax({
+			type: "POST",
+			url: "/mushrooms/cart/delete",
+			data: JSON.stringify({"deleteIdList": deleteIdList}),
+			dataType: "json",
+			contentType: "application/json"
+		})
+		.then(
+				(result)=>{
+
+					//　削除したカートを非表示
+					for (checked of checkedList){
+						$(checked).parent().parent().remove();
+					}
+
+					//カートの有無を調べ、リダイレクト
+					let checkBox = $('.checkbox');
+					if(checkBox.length == 0){
+						location.replace('/mushrooms/cart/');
+					}
+
+					//合計個数と金額を変更
+					calcTotal();
+
+					// 削除ボタン非活性
+					changeDeleteBtn();
+
+				},
+				() => {
+					console.log("ERROR: ajax connection failed.");
+				}
+		);
+	};
+
+
+/*]]>*/
+</script>
+</body>
+</html>
